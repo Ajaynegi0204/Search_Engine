@@ -6,14 +6,14 @@ from dotenv import load_dotenv
 import nltk
 from nltk.corpus import stopwords
 
-# Load environment variables
+
 load_dotenv()
 
-# Download stopwords if not already
+
 nltk.download('stopwords')
 stop_words = set(stopwords.words('english'))
 
-# Custom DSA buzzwords to remove
+
 buzzwords = {
     "given", "print", "find", "determine", "check", "output", "input", "consists",
     "contains", "return", "provided", "write", "read", "you", "your", "are", "task",
@@ -26,14 +26,14 @@ buzzwords = {
 }
 
 
-BATCH_SIZE = 100
+BATCH_SIZE = 500
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def clean_text(text):
-    text = text.encode('ascii', 'ignore').decode('ascii')  # Remove non-ascii
-    text = re.sub(r'<[^>]+>', ' ', text)  # Remove HTML tags
-    text = re.sub(r'[^a-zA-Z\s]', ' ', text)  # Remove punctuation/numbers
+    text = text.encode('ascii', 'ignore').decode('ascii')
+    text = re.sub(r'<[^>]+>', ' ', text)
+    text = re.sub(r'[^a-zA-Z\s]', ' ', text)
     text = text.lower()
     tokens = text.split()
     tokens = [t for t in tokens if t not in stop_words and t not in buzzwords]
@@ -53,14 +53,13 @@ def update_problem_statements():
         conn = connect_db()
         cur = conn.cursor()
 
-        # Fetch id, raw statement, and topics
+
         cur.execute("SELECT id, problem_statement, topics FROM problems")
         all_rows = cur.fetchall()
         logging.info(f"Fetched {len(all_rows)} rows")
 
         updates = []
         for idx, (pid, statement, topics) in enumerate(all_rows):
-            # Combine statement with topics (make topics a string)
             combined_text = f"{statement or ''} {' '.join(topics or [])}"
             cleaned = clean_text(combined_text)
             updates.append((cleaned, pid))
