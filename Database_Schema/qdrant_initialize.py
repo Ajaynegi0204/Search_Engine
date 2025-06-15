@@ -10,9 +10,9 @@ qdrant_client = QdrantClient(
 )
 
 VOCAB_SIZE = 25602
-if not qdrant_client.collection_exists(collection_name="problems"):
+if not qdrant_client.collection_exists(collection_name="problems_v2"):
     qdrant_client.create_collection(
-        collection_name="problems",
+        collection_name="problems_v2",
         vectors_config=VectorParams(size=VOCAB_SIZE, distance=Distance.COSINE),
     )
 else:
