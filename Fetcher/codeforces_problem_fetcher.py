@@ -53,5 +53,5 @@ with open(output_file, 'w') as f:
 
 logging.info(f"Total unique links found: {len(all_links)}")
 
-# Quit the Selenium WebDriver
+
 driver.quit()
