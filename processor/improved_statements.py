@@ -129,7 +129,6 @@ def expand_problem_statements():
         updates = []
         for idx, (pid, statement) in enumerate(all_rows):
             updated_statement = add_synonyms_to_text(statement)
-            updates.append((updated_statement, pid))
 
             if len(updates) == BATCH_SIZE or idx == len(all_rows) - 1:
                 cur.executemany("UPDATE problems SET problem_statement = %s WHERE id = %s", updates)
