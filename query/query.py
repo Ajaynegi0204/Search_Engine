@@ -7,10 +7,9 @@ from qdrant_client import QdrantClient
 import os
 from dotenv import load_dotenv
 
-# Add this line to load the .env file
+
 load_dotenv()
 
-# ---- DSA Synonyms Dictionary ----
 DSA_SYNONYMS = {
     "dp": ["dynamic programming", "memoization", "tabulation", "recursion with cache", "recurrence relation",
            "dp formula"],
@@ -98,7 +97,6 @@ for key, synonyms in DSA_SYNONYMS.items():
     for phrase in synonyms:
         FLATTENED_SYNONYMS[phrase.lower()] = key.lower()
 
-# ---- Redis Setup ----
 r = redis.Redis(
     host='redis-14042.crce179.ap-south-1-1.ec2.redns.redis-cloud.com',
     port=14042,
@@ -107,38 +105,33 @@ r = redis.Redis(
     decode_responses=True,
 )
 
-# ---- Qdrant Setup ----
+
 qdrant = QdrantClient(
     url=os.getenv("qdrant_url"),
     api_key=os.getenv("qdrant_apikey"),
     timeout=300.0
 )
 
-# ---- Load IDF & Vocab from Redis (only once) ----
+
 idf = json.loads(r.get("idf_json"))
 vocab = json.loads(r.get("vocab_json"))
 word2idx = {w: i for i, w in enumerate(vocab)}
 
 
-# ---- Expand Query with Synonyms ----
 def expand_query(query):
-    """Expand the query by adding relevant synonyms"""
     original_words = query.lower().split()
     expanded_terms = set(original_words)
 
-    # Check for exact matches in DSA_SYNONYMS keys
     for word in original_words:
         if word in DSA_SYNONYMS:
             expanded_terms.update(DSA_SYNONYMS[word])
 
-    # Check for multi-word phrases
     query_lower = query.lower()
     for canonical, synonyms in DSA_SYNONYMS.items():
         if canonical in query_lower:
             expanded_terms.update(synonyms)
             expanded_terms.add(canonical)
 
-    # Check if query contains any synonym phrases
     for synonym, canonical in FLATTENED_SYNONYMS.items():
         if synonym in query_lower:
             expanded_terms.add(canonical)
@@ -146,17 +139,14 @@ def expand_query(query):
                 expanded_terms.update(DSA_SYNONYMS[canonical])
 
     expanded_query = " ".join(expanded_terms)
-
-    # Show expansion for debugging
     if len(expanded_terms) > len(original_words):
-        print(f"📝 Query expanded from: '{query}'")
-        print(f"📝 To: '{expanded_query}'")
+        print(f" Query expanded from: '{query}'")
+        print(f" To: '{expanded_query}'")
         print("-" * 60)
 
     return expanded_query
 
 
-# ---- Compute TF-IDF vector ----
 def tfidf_vector(text):
     count = defaultdict(int)
     for w in text.strip().split():
@@ -171,12 +161,8 @@ def tfidf_vector(text):
     return [x / norm for x in vec] if norm else vec
 
 
-# ---- Search in Qdrant ----
 def search(query):
-    # Expand the query with synonyms
     expanded_query = expand_query(query)
-
-    # Compute TF-IDF vector for expanded query
     vec = tfidf_vector(expanded_query)
 
     response = qdrant.query_points(
@@ -186,7 +172,6 @@ def search(query):
         with_payload=True,
     )
 
-    # Extract points from the QueryResponse object
     results = response.points
 
     print(f"🔍 Found {len(results)} results for query: '{query}'")
@@ -212,6 +197,5 @@ def search(query):
             print(f"    Point: {point}")
 
 
-# ---- Run ----
 if __name__ == "__main__":
     search(input("Enter your DSA query: "))

@@ -4,28 +4,23 @@ import logging
 import re
 import psycopg2
 import os
-import json
 import threading
 import queue
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor
-from time import sleep
 
-# Load environment variables
+
 load_dotenv()
 batch_size = 50
 max_threads = 10
 input_file = '../lc.txt'
 
-# Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Clean text
 def clean_text(text):
     text = text.encode('ascii', 'ignore').decode('ascii')
     return re.sub(r'\s+', ' ', text).strip()
 
-# Extract problem from LeetCode
 def extract_problem_details(slug_url):
     try:
         scraper = cloudscraper.create_scraper()
@@ -77,7 +72,6 @@ def extract_problem_details(slug_url):
         logging.error(f"Error processing {slug_url}: {e}")
         return None
 
-# Insert into DB
 def insert_batch(batch):
     try:
         conn = psycopg2.connect(
@@ -106,12 +100,11 @@ def insert_batch(batch):
         cur.close()
         conn.close()
 
-# Background thread: collects problems and inserts in batches
 def batch_inserter_worker(problem_queue):
     buffer = []
     while True:
         problem = problem_queue.get()
-        if problem is None:  # Sentinel value to stop thread
+        if problem is None:
             if buffer:
                 insert_batch(buffer)
             break
@@ -121,20 +114,15 @@ def batch_inserter_worker(problem_queue):
             insert_batch(buffer)
             buffer = []
 
-# Main function
 if __name__ == "__main__":
     problem_queue = queue.Queue()
-
-    # Start the background batch-inserter thread
     inserter_thread = threading.Thread(target=batch_inserter_worker, args=(problem_queue,))
     inserter_thread.start()
 
-    # Read URLs
     urls = []
     with open(input_file, 'r') as file:
         urls = [line.strip() for line in file if line.strip()]
 
-    # Start scraping in parallel
     with ThreadPoolExecutor(max_workers=max_threads) as executor:
         for url in urls:
             executor.submit(
@@ -142,6 +130,5 @@ if __name__ == "__main__":
                 url
             )
 
-    # Signal end of work
     problem_queue.put(None)
     inserter_thread.join()

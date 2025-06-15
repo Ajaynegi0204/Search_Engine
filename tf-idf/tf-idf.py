@@ -15,7 +15,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 100  # Configurable batch size for DB fetch and Qdrant operations
+BATCH_SIZE = 100
 
 
 def connect_db():
@@ -51,11 +51,7 @@ class TfIdfProcessor:
             conn.close()
 
     def build_vocab_and_doc_freq(self):
-        """
-        First pass: compute document frequency and vocabulary without storing all text.
-        Returns total_docs (int), doc_freq (dict), vocab_list (list)
-        """
-        doc_freq = defaultdict(int)  # in how many documents each word appears
+        doc_freq = defaultdict(int)
         total_docs = 0
         vocab = set()
 
@@ -76,10 +72,6 @@ class TfIdfProcessor:
         return total_docs, doc_freq, vocab_list
 
     def fetch_existing_payloads(self, ids):
-        """
-        Fetch payloads in batches for given ids from Qdrant.
-        Returns dictionary {id: payload}.
-        """
         existing_payloads = {}
         logger.info(f"Fetching existing payloads for {len(ids)} points")
         for i in range(0, len(ids), BATCH_SIZE):
@@ -97,15 +89,10 @@ class TfIdfProcessor:
         return existing_payloads
 
     def compute_idf(self, total_docs, doc_freq):
-        """Compute IDF score per term."""
         idf = {w: 1 + math.log(total_docs / freq) for w, freq in doc_freq.items()}
         return idf
 
     def compute_tf_idf_vector(self, word_counts, idf, word2idx):
-        """
-        Compute TF-IDF vector given word counts, idf dict, and word2idx mapping.
-        Returns a list vector of floats.
-        """
         total_words = sum(word_counts.values())
         vec = [0.0] * len(word2idx)
         for w, count in word_counts.items():
@@ -120,7 +107,6 @@ class TfIdfProcessor:
         return vec
 
     def retry_upsert(self, points, max_retries=5, base_delay=2.0):
-        """Upsert points into Qdrant with retry logic and exponential backoff."""
         attempt = 0
         while attempt <= max_retries:
             try:
@@ -134,13 +120,8 @@ class TfIdfProcessor:
         logger.error(f"Failed to upsert points after {max_retries} retries.")
 
     def process_and_upsert(self):
-        """
-        Run full two-pass TF-IDF computation and upsert vectors to Qdrant.
-        """
-        # First pass - get vocab and doc freq
         total_docs, doc_freq, vocab_list = self.build_vocab_and_doc_freq()
 
-        # Prepare ID mapping and IDF scores
         word2idx = {w: i for i, w in enumerate(vocab_list)}
         idf = self.compute_idf(total_docs, doc_freq)
 
@@ -150,7 +131,6 @@ class TfIdfProcessor:
             batch_ids = []
             batch_word_counts = []
 
-            # Prepare per-document word counts in batch
             for pid, text in batch:
                 words = text.split()
                 wc = defaultdict(int)
@@ -159,17 +139,14 @@ class TfIdfProcessor:
                 batch_ids.append(pid)
                 batch_word_counts.append((pid, wc))
 
-            # Retrieve existing payloads for preservation
             existing_payloads = self.fetch_existing_payloads(batch_ids)
 
-            # Prepare points for upsert
             points_to_upsert = []
             for pid, wc in batch_word_counts:
                 vector = self.compute_tf_idf_vector(wc, idf, word2idx)
                 payload = existing_payloads.get(pid, {})
                 points_to_upsert.append(PointStruct(id=int(pid), vector=vector, payload=payload))
 
-            # Upsert in smaller batches to avoid timeouts
             for i in range(0, len(points_to_upsert), BATCH_SIZE):
                 chunk = points_to_upsert[i:i + BATCH_SIZE]
                 self.retry_upsert(chunk)

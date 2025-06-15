@@ -6,26 +6,19 @@ import psycopg2
 import os
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 batch_size = 100
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# File containing the links
 input_file = '../codeforces.txt'
 
-# Clean text function
+
 def clean_text(text):
-    # Remove Unicode characters
     text = text.encode('ascii', 'ignore').decode('ascii')
-    # Normalize whitespace
     text = re.sub(r'\s+', ' ', text)
-    # Trim leading and trailing spaces
     return text.strip()
 
-# Extract problem details
 def extract_problem_details(url):
     try:
         scraper = cloudscraper.create_scraper()
@@ -55,10 +48,9 @@ def extract_problem_details(url):
         logging.error(f"Error processing URL {url}: {e}")
         return None
 
-# Insert data into the database in batches
+
 def insert_problems_in_batches(data, batch_size=10):
     try:
-        # Connect to the database
         conn = psycopg2.connect(
             user=os.getenv("user"),
             password=os.getenv("password"),
@@ -68,14 +60,12 @@ def insert_problems_in_batches(data, batch_size=10):
         )
         cur = conn.cursor()
 
-        # Prepare the SQL query
         insert_query = '''
         INSERT INTO problems (problem_name, problem_link, platform, problem_statement, topics)
         VALUES (%s, %s, %s, %s, %s)
         ON CONFLICT (problem_link) DO NOTHING;
         '''
 
-        # Insert data in batches
         for i in range(0, len(data), batch_size):
             batch = data[i:i + batch_size]
             values = [
@@ -97,11 +87,10 @@ def insert_problems_in_batches(data, batch_size=10):
         cur.close()
         conn.close()
 
-# Main script to process URLs and insert into the database
+
 if __name__ == "__main__":
     problems = []
 
-    # Read links from the file and process them
     with open(input_file, 'r') as file:
         for line in file:
             url = line.strip()
@@ -115,6 +104,5 @@ if __name__ == "__main__":
                     insert_problems_in_batches(problems, batch_size= batch_size)
                     problems = []
 
-    # Insert problems into the database in batches
     if problems:
         insert_problems_in_batches(problems, batch_size=100)
