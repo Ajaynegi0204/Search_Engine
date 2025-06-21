@@ -2,16 +2,16 @@ import redis
 import json
 import math
 from collections import defaultdict
-from qdrant_client.models import PointStruct, Filter, FieldCondition, MatchValue
+from qdrant_client.models import PointStruct
 from qdrant_client import QdrantClient
 import os
+import sys
 from dotenv import load_dotenv
-
 
 load_dotenv()
 
 DSA_SYNONYMS = {
-    "dp": ["dynamic programming", "memoization", "tabulation", "recursion with cache", "recurrence relation",
+    "dp": ["dynamic programming", "memoization", "tabulation", "recurrence relation",
            "dp formula"],
     "tree dp": ["dp on tree", "dfs dp", "subtree dp"],
     "digit dp": ["dp on digits", "number dp"],
@@ -91,7 +91,7 @@ DSA_SYNONYMS = {
     "grid": ["matrix", "board", "cells"]
 }
 
-# Create reverse mapping for query expansion
+
 FLATTENED_SYNONYMS = {}
 for key, synonyms in DSA_SYNONYMS.items():
     for phrase in synonyms:
@@ -105,18 +105,15 @@ r = redis.Redis(
     decode_responses=True,
 )
 
-
 qdrant = QdrantClient(
     url=os.getenv("qdrant_url"),
     api_key=os.getenv("qdrant_apikey"),
     timeout=300.0
 )
 
-
 idf = json.loads(r.get("idf_json"))
 vocab = json.loads(r.get("vocab_json"))
 word2idx = {w: i for i, w in enumerate(vocab)}
-
 
 def expand_query(query):
     original_words = query.lower().split()
@@ -140,9 +137,9 @@ def expand_query(query):
 
     expanded_query = " ".join(expanded_terms)
     if len(expanded_terms) > len(original_words):
-        print(f" Query expanded from: '{query}'")
-        print(f" To: '{expanded_query}'")
-        print("-" * 60)
+        print(f"Query expanded from: '{query}'", file=sys.stderr)
+        print(f"To: '{expanded_query}'", file=sys.stderr)
+        print("-" * 60, file=sys.stderr)
 
     return expanded_query
 
@@ -160,7 +157,6 @@ def tfidf_vector(text):
     norm = math.sqrt(sum(x * x for x in vec))
     return [x / norm for x in vec] if norm else vec
 
-
 def search(query):
     expanded_query = expand_query(query)
     vec = tfidf_vector(expanded_query)
@@ -168,34 +164,32 @@ def search(query):
     response = qdrant.query_points(
         collection_name="problems_v2",
         query=vec,
-        limit=10,
-        with_payload=True,
+        limit=100,
+        with_payload={
+            "include": ["problem_name", "problem_link", "platform"]
+        }
     )
 
-    results = response.points
+    results = []
+    for point in response.points:
+        payload = point.payload or {}
+        results.append({
+            "problem_name": payload.get("problem_name", "N/A"),
+            "problem_link": payload.get("problem_link", "N/A"),
+            "platform": payload.get("platform", "N/A")
+        })
 
-    print(f"🔍 Found {len(results)} results for query: '{query}'")
-    print("-" * 60)
+    return results
 
-    for i, point in enumerate(results, 1):
-        try:
-            payload = point.payload or {}
-            name = payload.get('problem_name', 'N/A')
-            link = payload.get('problem_link', 'N/A')
-            platform = payload.get('platform', 'N/A')
-            topics = payload.get('topics', [])
-            score = point.score if hasattr(point, 'score') else 'N/A'
-
-            print(f"{i}. {name}")
-            print(f" Platform: {platform}")
-            print(f"   🔗 Link: {link}")
-            print(f"   📊 Score: {score:.4f}" if isinstance(score, (int, float)) else f"   📊 Score: {score}")
-            print()
-
-        except Exception as e:
-            print(f"{i}. Error processing result: {e}")
-            print(f"    Point: {point}")
-
+def main():
+    raw_input = sys.stdin.read()
+    try:
+        data = json.loads(raw_input)
+        query = data.get("query", "")
+        results = search(query)
+        print(json.dumps(results, indent=2))
+    except Exception as e:
+        print(json.dumps({"error": str(e)}), file=sys.stderr)
 
 if __name__ == "__main__":
-    search(input("Enter your DSA query: "))
+    main()
