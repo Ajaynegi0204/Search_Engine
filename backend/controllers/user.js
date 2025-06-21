@@ -103,13 +103,14 @@ async function login(req, res) {
       { expiresIn: '7d' }
     );
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'None',
-      maxAge: 7 * 24 * 60 * 60 * 1000
-    });
-
+        res.cookie('token', token, {
+          httpOnly: true,
+          secure: true,          // Must be true for HTTPS
+          sameSite: 'None',      // Required for cross-site cookies
+          domain: '.onrender.com', // Key fix: Add this to share across subdomains
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+          path: '/'              // Ensure cookie is accessible on all paths
+       });
     res.status(200).json({
       success: true,
       user: { id: user.id, username: user.username, email: user.email }
@@ -124,11 +125,13 @@ async function login(req, res) {
 }
 
 async function logout(req, res) {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Lax'
-  });
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None',
+        domain: '.onrender.com',
+        path: '/'
+      });
   res.json({ success: true });
 }
 
