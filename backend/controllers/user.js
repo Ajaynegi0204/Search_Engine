@@ -13,7 +13,7 @@ async function signup(req, res) {
   const lower_email = req.body.email?.toLowerCase();
   const parsed = signupSchema.safeParse({
     username: req.body.username,
-    lower_email,
+    email:lower_email,
     password: req.body.password,
   });
 
@@ -62,7 +62,7 @@ async function signup(req, res) {
 
 async function login(req, res) {
   const lower_email = req.body.email?.toLowerCase();
-  const parsed = loginSchema.safeParse({ lower_email, password: req.body.password });
+  const parsed = loginSchema.safeParse({ email:lower_email, password: req.body.password });
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.issues[0].message });
   }
