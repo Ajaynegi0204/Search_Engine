@@ -10,9 +10,10 @@ if (!process.env.JWT_SECRET) {
 }
 
 async function signup(req, res) {
+  const lower_email = req.body.email?.toLowerCase();
   const parsed = signupSchema.safeParse({
-    username: req.body.username, // Changed from req.body.name to req.body.username
-    email: req.body.email,
+    username: req.body.username,
+    lower_email,
     password: req.body.password,
   });
 
@@ -60,7 +61,8 @@ async function signup(req, res) {
 }
 
 async function login(req, res) {
-  const parsed = loginSchema.safeParse(req.body);
+  const lower_email = req.body.email?.toLowerCase();
+  const parsed = loginSchema.safeParse({ lower_email, password: req.body.password });
   if (!parsed.success) {
     return res.status(400).json({ success: false, message: parsed.error.issues[0].message });
   }
