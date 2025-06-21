@@ -11,7 +11,7 @@ if (!process.env.JWT_SECRET) {
 
 async function signup(req, res) {
   const parsed = signupSchema.safeParse({
-    username: req.body.name,
+    username: req.body.username, // Changed from req.body.name to req.body.username
     email: req.body.email,
     password: req.body.password,
   });
@@ -28,8 +28,8 @@ async function signup(req, res) {
   try {
     // Check if user already exists
     const userExists = await pool.query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
+      'SELECT id FROM users WHERE email = $1 OR username = $2',
+      [email, username]
     );
 
     if (userExists.rows.length > 0) {
@@ -46,20 +46,6 @@ async function signup(req, res) {
     );
 
     const user = result.rows[0];
-    const token = jwt.sign(
-      { userId: user.id, email: user.email }, // Consistent payload
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    // Set HTTP-only cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    });
-
     res.status(201).json({
       success: true,
       user: { id: user.id, username: user.username, email: user.email }
@@ -93,7 +79,7 @@ async function login(req, res) {
     if (result.rows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid credentials' // Generic message for security
+        message: 'Invalid credentials'
       });
     }
 
@@ -108,17 +94,20 @@ async function login(req, res) {
     }
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email }, // Consistent payload
+      {
+        userId: user.id, // Added userId to payload
+        username: user.username,
+        email: user.email
+      },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 
-    // Set HTTP-only cookie
     res.cookie('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      secure: true,
+      sameSite: 'None',
+      maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     res.status(200).json({
@@ -134,59 +123,15 @@ async function login(req, res) {
   }
 }
 
-const verifyToken = (req, res, next) => {
-  const token = req.cookies.token ||
-                req.headers['authorization']?.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({
-      success: false,
-      error: "Unauthorized",
-      details: "No authentication token provided"
-    });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
-    if (err) {
-      return res.status(401).json({
-        success: false,
-        error: "Unauthorized",
-        details: "Invalid or expired token"
-      });
-    }
-
-    try {
-      // Verify user exists in database
-      const { rows } = await pool.query(
-        'SELECT id, username, email FROM users WHERE id = $1',
-        [decoded.userId] // Matches payload from login/signup
-      );
-
-      if (rows.length === 0) {
-        return res.status(401).json({
-          success: false,
-          error: "Unauthorized",
-          details: "User not found"
-        });
-      }
-
-      // Attach user to request
-      req.user = {
-        userId: decoded.userId,
-        email: decoded.email,
-        username: rows[0].username
-      };
-
-      next();
-    } catch (dbErr) {
-      console.error("Database verification error:", dbErr);
-      res.status(500).json({
-        success: false,
-        error: "Internal server error",
-        details: "Could not verify user"
-      });
-    }
+async function logout(req, res) {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax'
   });
-};
+  res.json({ success: true });
+}
 
-module.exports = { signup, login, verifyToken };
+
+
+module.exports = { signup, login , logout};

@@ -1,7 +1,7 @@
 const express = require("express");
 const { spawn } = require("child_process");
 const path = require("path");
-const {verifyToken} = require("../controllers/user");
+const {verifyToken} = require("../controllers/middleware");
 const router = express.Router();
 
 const QUERY_TIMEOUT = process.env.QUERY_TIMEOUT || 120000;
