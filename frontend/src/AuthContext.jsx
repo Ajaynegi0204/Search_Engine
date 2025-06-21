@@ -11,7 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Configure axios instance
+  // Create a shared axios instance
   const api = axios.create({
     baseURL: 'https://search-engine-2-kcv6.onrender.com',
     headers: {
@@ -19,16 +19,14 @@ export const AuthProvider = ({ children }) => {
     }
   });
 
-  // Add/remove auth token from requests
-  useEffect(() => {
-    if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      localStorage.setItem('token', token);
-    } else {
-      delete api.defaults.headers.common['Authorization'];
-      localStorage.removeItem('token');
+  // Interceptor to attach token dynamically
+  api.interceptors.request.use((config) => {
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      config.headers.Authorization = `Bearer ${storedToken}`;
     }
-  }, [token]);
+    return config;
+  });
 
   const login = async (credentials) => {
     setLoading(true);
@@ -36,6 +34,7 @@ export const AuthProvider = ({ children }) => {
       const { data } = await api.post('/api/user/login', credentials);
       setToken(data.token);
       setUser(data.user);
+      localStorage.setItem('token', data.token);
       navigate('/dashboard');
       toast.success('Logged in successfully!');
     } catch (error) {
@@ -54,22 +53,21 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout API error:', error);
     } finally {
-      // Always perform cleanup
+      // Clear state and localStorage
       setToken(null);
       setUser(null);
       localStorage.removeItem('token');
-      delete api.defaults.headers.common['Authorization'];
       navigate('/');
       toast.success('Logged out successfully!');
       setLoading(false);
     }
   };
 
-  // Verify auth status on mount
   useEffect(() => {
     const verifyAuth = async () => {
-      if (!token) return;
-      
+      const storedToken = localStorage.getItem('token');
+      if (!storedToken) return;
+
       try {
         const { data } = await api.get('/api/user/verify-token');
         setUser(data.user);
@@ -77,10 +75,13 @@ export const AuthProvider = ({ children }) => {
           navigate('/dashboard');
         }
       } catch (error) {
-        // Token verification failed - clear everything
-        setToken(null);
-        localStorage.removeItem('token');
-        delete api.defaults.headers.common['Authorization'];
+        if (error.response?.status === 401) {
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem('token');
+        } else {
+          console.error('Token verification failed:', error);
+        }
       }
     };
 
@@ -88,14 +89,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      token, 
-      loading,
-      login, 
-      logout, 
-      api 
-    }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, api }}>
       {children}
     </AuthContext.Provider>
   );
