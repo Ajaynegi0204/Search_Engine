@@ -1,14 +1,16 @@
 const jwt = require('jsonwebtoken');
 
 const verifyToken = (req, res, next) => {
-  const token = req.cookies?.token || req.headers?.authorization?.split(' ')[1];
+  const authHeader = req.headers.authorization;
 
-  if (!token) {
+  if (!authHeader?.startsWith('Bearer ')) {
     return res.status(401).json({
       success: false,
-      message: 'Authentication required'
+      message: 'Authorization token required'
     });
   }
+
+  const token = authHeader.split(' ')[1];
 
   jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
     if (err) {
@@ -18,12 +20,7 @@ const verifyToken = (req, res, next) => {
       });
     }
 
-    req.user = {
-      userId: decoded.userId,
-      username: decoded.username,
-      email: decoded.email
-    };
-
+    req.user = decoded;
     next();
   });
 };

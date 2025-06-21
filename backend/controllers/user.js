@@ -82,22 +82,12 @@ async function login(req, res) {
     const token = jwt.sign(
       { userId: user.id, username: user.username, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: '1h' } // Shorter expiry for college project
+      { expiresIn: '7d' }
     );
-
-    // Simplified cookie settings
-    res.cookie('token', token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'None',
-        partitioned: true, // Critical for Chrome's new policy
-        domain: '.onrender.com', // Note the leading dot for all subdomains
-        path: '/',
-        maxAge: 3600000 // 1 hour
-      });
 
     res.json({
       success: true,
+      token,
       user: { id: user.id, username: user.username, email: user.email }
     });
 
@@ -107,15 +97,8 @@ async function login(req, res) {
   }
 }
 
-async function logout(req, res) {
-    res.clearCookie('token', {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'None',
-      partitioned: true,
-      domain: '.onrender.com',
-      path: '/'
-    });
+
+async function logout(req, res)  {
   res.json({ success: true });
 }
 
