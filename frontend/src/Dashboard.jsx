@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaSearch, FaSpinner, FaExternalLinkAlt, FaSignOutAlt, FaTimes, FaCode } from "react-icons/fa";
 import { SiLeetcode, SiCodeforces } from "react-icons/si";
@@ -6,9 +6,10 @@ import { useAuth } from './AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Lottie from 'lottie-react';
 import foxAnimation from './assets/fox-animation.json';
+import { toast } from 'react-toastify';
 
 const Dashboard = () => {
-  const { api, logout } = useAuth();
+  const { api, logout, token } = useAuth();
   const [currentSearchPlatform, setCurrentSearchPlatform] = useState("all");
   const [query, setQuery] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,49 +21,83 @@ const Dashboard = () => {
   const resultsContainerRef = useRef(null);
   const navigate = useNavigate();
 
-  const SEARCH_TIMEOUT = 60000*2; 
+  const SEARCH_TIMEOUT = 60000 * 2;
+
+  // Redirect if no token
+  useEffect(() => {
+    if (!token) {
+      navigate('/');
+      toast.error('Please login to access dashboard');
+    }
+  }, [token, navigate]);
+
+  // Handle API response errors
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      response => response,
+      error => {
+        if (error.response?.status === 401) {
+          logout();
+          navigate('/');
+          toast.error('Session expired. Please login again.');
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      api.interceptors.response.eject(interceptor);
+    };
+  }, [api, logout, navigate]);
 
   const handleSearch = async (e) => {
-  if (e) e.preventDefault();
-  const trimmedQuery = query.trim();
-  if (!trimmedQuery || loading) { 
-    setError(loading ? "Please wait for current search to complete" : "Please enter a search query");
-    return;
-  }
+    if (e) e.preventDefault();
+    
+    if (!token) {
+      setError("Please login to search");
+      navigate('/');
+      return;
+    }
 
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || loading) { 
+      setError(loading ? "Please wait for current search to complete" : "Please enter a search query");
+      return;
+    }
 
-  setSearchTerm(trimmedQuery);
-  setCurrentSearchPlatform(selectedPlatform);  
-  setHasSearched(true);
-  setLoading(true);
-  setError("");
-  setResults([]);
+    setSearchTerm(trimmedQuery);
+    setCurrentSearchPlatform(selectedPlatform);  
+    setHasSearched(true);
+    setLoading(true);
+    setError("");
+    setResults([]);
 
-  try {
-    const requestBody = selectedPlatform !== "all"
-      ? { query: trimmedQuery, filters: { platform: selectedPlatform } }
-      : { query: trimmedQuery };
+    try {
+      const requestBody = selectedPlatform !== "all"
+        ? { query: trimmedQuery, filters: { platform: selectedPlatform } }
+        : { query: trimmedQuery };
 
-    const { data } = await api.post('/api/query', requestBody, {
-      timeout: SEARCH_TIMEOUT
-    });
+      const { data } = await api.post('/api/query', requestBody, {
+        timeout: SEARCH_TIMEOUT
+      });
 
-    if (!data) throw new Error("Server returned empty response");
-    if (data.error) throw new Error(data.error);
+      if (!data) throw new Error("Server returned empty response");
+      if (data.error) throw new Error(data.error);
 
-    const filteredResults = selectedPlatform !== "all"
-      ? (Array.isArray(data) ? data : []).filter(item => 
-          item.platform.toLowerCase() === selectedPlatform.toLowerCase()
-        )
-      : (Array.isArray(data) ? data : []);
+      const filteredResults = selectedPlatform !== "all"
+        ? (Array.isArray(data) ? data : []).filter(item => 
+            item.platform.toLowerCase() === selectedPlatform.toLowerCase()
+          )
+        : (Array.isArray(data) ? data : []);
 
-    setResults(filteredResults);
-  } catch (err) {
-    setError(err.response?.data?.message || "Failed to fetch results");
-  } finally {
-    setLoading(false);
-  }
-};
+      setResults(filteredResults);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to fetch results");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const clearSearch = () => {
     setQuery("");
     setSearchTerm("");
@@ -73,13 +108,21 @@ const Dashboard = () => {
   };
 
   const handleLogout = async () => {
-  try {
-    await logout(); 
-    navigate('/');
-  } catch (error) {
-    console.error("Logout error:", error);
-  }
-};
+    try {
+      await logout();
+      setResults([]);
+      setQuery("");
+      navigate('/');
+      toast.success('Logged out successfully');
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Force logout anyway
+      setResults([]);
+      setQuery("");
+      navigate('/');
+    }
+  };
+
   const platformData = {
     all: {
       icon: <div className="flex items-center space-x-1">
@@ -103,12 +146,14 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-8 font-sans text-gray-100 relative overflow-hidden">
+      {/* Background elements */}
       <div className="absolute right-10 bottom-10 w-64 h-64 z-0 opacity-40 hover:opacity-70 transition-opacity">
         <Lottie animationData={foxAnimation} loop={true} />
       </div>
       <div className="absolute inset-0 bg-gradient-to-b from-blue-900/10 via-transparent to-purple-900/10 pointer-events-none z-0"></div>
 
       <div className="max-w-7xl mx-auto relative z-10">
+        {/* Header */}
         <header className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-3 group">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center group-hover:from-blue-400 group-hover:to-purple-400 transition-all">
@@ -127,6 +172,7 @@ const Dashboard = () => {
           </button>
         </header>
 
+        {/* Search Section */}
         <div className="bg-gray-800/70 backdrop-blur-lg rounded-xl shadow-lg p-6 mb-8 border border-gray-700/50 relative overflow-hidden">
           <div className="absolute -right-20 -top-20 w-64 h-64 bg-blue-500/10 rounded-full filter blur-3xl"></div>
           <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-purple-500/10 rounded-full filter blur-3xl"></div>
@@ -143,21 +189,22 @@ const Dashboard = () => {
                 onChange={(e) => !loading && setQuery(e.target.value)}
                 disabled={loading}
                 className={`block w-full pl-12 pr-24 py-3 border border-gray-700 rounded-lg bg-gray-900/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-200 placeholder-gray-500 transition-all ${
-      loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  loading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               />
               <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex space-x-2">
-                  {query && (
-                    <button
-                      type="button"
-                      onClick={() => !loading && clearSearch()}  
-                      disabled={loading} 
-                      className={`text-gray-400 hover:text-gray-200 p-2 ${
-                        loading ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}  
-                    >
-                      <FaTimes />
-                    </button>
-                  )}
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => !loading && clearSearch()}  
+                    disabled={loading} 
+                    className={`text-gray-400 hover:text-gray-200 p-2 ${
+                      loading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}  
+                  >
+                    <FaTimes />
+                  </button>
+                )}
                 <button
                   type="submit"
                   className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-4 py-1.5 rounded-lg flex items-center disabled:opacity-70 hover:shadow-lg hover:shadow-blue-500/20 transition-all"
@@ -174,28 +221,29 @@ const Dashboard = () => {
             </div>
 
             <div className="flex flex-wrap gap-2">
-                {Object.entries(platformData).map(([platform, data]) => (
-                  <button
-                    key={platform}
-                    type="button"
-                    disabled={loading} 
-                    className={`px-4 py-2 rounded-lg flex items-center text-sm transition-all ${
-                      selectedPlatform === platform
-                        ? `bg-gradient-to-r ${data.color} text-white shadow-md`
-                        : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-                    } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}  
-                    onClick={() => !loading && setSelectedPlatform(platform)} 
-                  >
-                    <span className="mr-2">
-                      {data.icon}
-                    </span>
-                    {data.name}
-                  </button>
-                ))}
-              </div>
+              {Object.entries(platformData).map(([platform, data]) => (
+                <button
+                  key={platform}
+                  type="button"
+                  disabled={loading} 
+                  className={`px-4 py-2 rounded-lg flex items-center text-sm transition-all ${
+                    selectedPlatform === platform
+                      ? `bg-gradient-to-r ${data.color} text-white shadow-md`
+                      : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}  
+                  onClick={() => !loading && setSelectedPlatform(platform)} 
+                >
+                  <span className="mr-2">
+                    {data.icon}
+                  </span>
+                  {data.name}
+                </button>
+              ))}
+            </div>
           </form>
         </div>
 
+        {/* Results Section */}
         <div className="bg-gray-800/70 backdrop-blur-lg rounded-xl shadow-lg overflow-hidden border border-gray-700/50 relative">
           <div className="border-b border-gray-700/50 px-6 py-4 bg-gradient-to-r from-gray-800 to-gray-800/50">
             <h2 className="text-xl font-semibold text-gray-100 flex items-center">
@@ -247,8 +295,8 @@ const Dashboard = () => {
                     Searching for problems...
                   </h3>
                   <p className="text-gray-400">
-                      Looking for" {searchTerm}" in {platformData[currentSearchPlatform].name}
-                </p>
+                    Looking for "{searchTerm}" in {platformData[currentSearchPlatform].name}
+                  </p>
                 </motion.div>
               )}
 
