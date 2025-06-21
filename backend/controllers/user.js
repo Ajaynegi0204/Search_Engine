@@ -29,8 +29,8 @@ async function signup(req, res) {
   try {
     // Check if user already exists
     const userExists = await pool.query(
-      'SELECT id FROM users WHERE email = $1 OR username = $2',
-      [email, username]
+      'SELECT id FROM users WHERE email = $1',
+      [email]
     );
 
     if (userExists.rows.length > 0) {
