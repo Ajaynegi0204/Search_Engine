@@ -7,6 +7,8 @@ const cors = require('cors');
 const { pool } = require('./controllers/db');
 
 const app = express();
+app.use(express.json({ limit: '10mb' }));
+app.use(cookieParser());
 
 app.use(cors({
   origin: 'https://search-engine-2yu7.onrender.com',
@@ -15,8 +17,7 @@ app.use(cors({
   exposedHeaders: ['set-cookie']
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(cookieParser());
+
 
 app.get('/health', async (req, res) => {
   try {

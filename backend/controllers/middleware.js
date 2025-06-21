@@ -1,15 +1,31 @@
+const jwt = require('jsonwebtoken');
+
 const verifyToken = (req, res, next) => {
-  const token = req.cookies.token;
+  const token = req.cookies?.token || req.headers?.authorization?.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ success: false, message: 'No token provided' });
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication required'
+    });
   }
 
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+    req.user = {
+      userId: decoded.userId,
+      username: decoded.username,
+      email: decoded.email
+    };
+
     next();
-  } catch (error) {
-    return res.status(401).json({ success: false, message: 'Invalid token' });
-  }
+  });
 };
+
+module.exports = { verifyToken };
