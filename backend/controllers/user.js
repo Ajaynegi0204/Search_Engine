@@ -79,34 +79,50 @@ async function login(req, res) {
   }
 }
 
-async function verifyToken(req, res) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader) {
-    console.log('No authorization header');
-    return res.status(401).json({ valid: false });
-  }
-
-  const token = authHeader.split(' ')[1];
+const verifyToken = (req, res, next) => {
+  const token = req.cookies.token ||
+                req.headers['authorization']?.split(' ')[1] ||
+                req.body.token;
 
   if (!token) {
-    console.log('No token provided');
-    return res.status(401).json({ valid: false });
-  }
-
-  try {
-    console.log('Verifying token:', token);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('Token valid for user:', decoded.email);
-    res.json({ valid: true });
-  } catch (err) {
-    console.log('Token verification failed:', err.message);
-    res.status(401).json({
-      valid: false,
-      error: err.message
+    return res.status(401).json({
+      error: "Unauthorized",
+      details: "No authentication token provided"
     });
   }
-}
 
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
+    if (err) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        details: "Invalid or expired token"
+      });
+    }
+
+    try {
+      // Verify user exists in database
+      const { rows } = await pool.query(
+        'SELECT id FROM users WHERE id = $1',
+        [decoded.userId]
+      );
+
+      if (rows.length === 0) {
+        return res.status(401).json({
+          error: "Unauthorized",
+          details: "User not found"
+        });
+      }
+
+      req.user = decoded;
+      next();
+    } catch (dbErr) {
+      console.error("Database verification error:", dbErr);
+      res.status(500).json({
+        error: "Internal server error",
+        details: "Could not verify user"
+      });
+    }
+  });
+};
 module.exports = { signup, login, verifyToken};
 
