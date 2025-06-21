@@ -87,11 +87,14 @@ async function login(req, res) {
 
     // Simplified cookie settings
     res.cookie('token', token, {
-      httpOnly: true,
-      secure: true,
-      sameSite: 'None',
-      maxAge: 3600000 // 1 hour
-    });
+        httpOnly: true,
+        secure: true,
+        sameSite: 'None',
+        partitioned: true, // Critical for Chrome's new policy
+        domain: '.onrender.com', // Note the leading dot for all subdomains
+        path: '/',
+        maxAge: 3600000 // 1 hour
+      });
 
     res.json({
       success: true,
@@ -105,11 +108,14 @@ async function login(req, res) {
 }
 
 async function logout(req, res) {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: true,
-    sameSite: 'None'
-  });
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+      partitioned: true,
+      domain: '.onrender.com',
+      path: '/'
+    });
   res.json({ success: true });
 }
 

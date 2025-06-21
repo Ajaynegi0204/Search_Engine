@@ -11,6 +11,8 @@ const app = express();
 app.use(cors({
   origin: 'https://search-engine-2yu7.onrender.com',
   credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['set-cookie']
 }));
 
 app.use(express.json({ limit: '10mb' }));

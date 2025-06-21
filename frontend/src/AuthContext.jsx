@@ -12,7 +12,11 @@ export const AuthProvider = ({ children }) => {
   // Configure axios to always send cookies
   const api = axios.create({
     baseURL: 'https://search-engine-2-kcv6.onrender.com',
-    withCredentials: true
+    withCredentials: true,
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
   });
 
   const login = async (credentials) => {
