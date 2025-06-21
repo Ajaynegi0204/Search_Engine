@@ -43,15 +43,7 @@ const Signup = () => {
                     setEmail("");
                     setPassword("");
                 } else {
-                    const { data } = await axios.post(
-                        `${backend}/api/user/login`,
-                        { email, password },
-                        { withCredentials: true }
-                    );
-                    if (data?.user) {
-                        navigate('/dashboard');
-                        toast.success("Login successful");
-                    }
+                     await login({ email, password });
                 }
             } catch (error) {
                 toast.error(error.response?.data?.message || error.message);

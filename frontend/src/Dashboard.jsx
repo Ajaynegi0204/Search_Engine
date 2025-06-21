@@ -72,11 +72,14 @@ const Dashboard = () => {
     setHasSearched(false);
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+  try {
+    await logout(); 
     navigate('/');
-  };
-
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
+};
   const platformData = {
     all: {
       icon: <div className="flex items-center space-x-1">

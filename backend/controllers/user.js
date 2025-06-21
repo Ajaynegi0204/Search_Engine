@@ -62,79 +62,56 @@ async function signup(req, res) {
 async function login(req, res) {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({
-      success: false,
-      message: parsed.error.issues[0].message
-    });
+    return res.status(400).json({ success: false, message: parsed.error.issues[0].message });
   }
 
   const { email, password } = parsed.data;
 
   try {
-    const result = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
-    );
-
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid credentials' });
     }
 
     const user = result.rows[0];
     const match = await bcrypt.compare(password, user.password);
-
     if (!match) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
 
     const token = jwt.sign(
-      {
-        userId: user.id, // Added userId to payload
-        username: user.username,
-        email: user.email
-      },
+      { userId: user.id, username: user.username, email: user.email },
       process.env.JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: '1h' } // Shorter expiry for college project
     );
 
-        res.cookie('token', token, {
-          httpOnly: true,
-          secure: true,          // Must be true for HTTPS
-          sameSite: 'None',      // Required for cross-site cookies
-          domain: '.onrender.com', // Key fix: Add this to share across subdomains
-          maxAge: 7 * 24 * 60 * 60 * 1000,
-          path: '/'              // Ensure cookie is accessible on all paths
-       });
-    res.status(200).json({
+    // Simplified cookie settings
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'None',
+      maxAge: 3600000 // 1 hour
+    });
+
+    res.json({
       success: true,
       user: { id: user.id, username: user.username, email: user.email }
     });
+
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({
-      success: false,
-      message: 'Login failed'
-    });
+    res.status(500).json({ success: false, message: 'Login failed' });
   }
 }
 
 async function logout(req, res) {
-    res.clearCookie('token', {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'None',
-        domain: '.onrender.com',
-        path: '/'
-      });
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'None'
+  });
   res.json({ success: true });
 }
-
 
 
 module.exports = { signup, login , logout};

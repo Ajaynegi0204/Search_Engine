@@ -42,5 +42,5 @@ module.exports = {
   signupSchema,
   loginSchema,
   pool,
-  queryTimeout: 60000
+  queryTimeout: 60000 // Export for consistency
 };
