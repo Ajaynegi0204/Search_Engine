@@ -98,11 +98,11 @@ for key, synonyms in DSA_SYNONYMS.items():
         FLATTENED_SYNONYMS[phrase.lower()] = key.lower()
 
 r = redis.Redis(
-    host='redis-14042.crce179.ap-south-1-1.ec2.redns.redis-cloud.com',
-    port=14042,
-    username="default",
-    password="tXnxcUbI5bazp5R8mXtl9qFumLOLBMHA",
+    host='redis-12077.c264.ap-south-1-1.ec2.redns.redis-cloud.com',
+    port=12077,
     decode_responses=True,
+    username="default",
+    password= os.getenv("redis_password"),
 )
 
 qdrant = QdrantClient(

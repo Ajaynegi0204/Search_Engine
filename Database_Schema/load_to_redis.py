@@ -1,13 +1,20 @@
 import json
 import redis
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 r = redis.Redis(
-    host='redis-14042.crce179.ap-south-1-1.ec2.redns.redis-cloud.com',
-    port=14042,
+    host='redis-12077.c264.ap-south-1-1.ec2.redns.redis-cloud.com',
+    port=12077,
     decode_responses=True,
     username="default",
-    password="tXnxcUbI5bazp5R8mXtl9qFumLOLBMHA",
+    password= os.getenv("redis_password"),
 )
+
+# print(os.getenv("redis_password"))
 
 with open("vocab.json", "r") as f:
     vocab_data = json.load(f)
